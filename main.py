@@ -5,6 +5,24 @@ from oauth2client.service_account import ServiceAccountCredentials
 import gspread
 
 
+def get_latest_news_articles(search_term='child tax credit'):
+    headers = {
+        # "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36 Edge/18.19582"
+    }
+
+    params = {
+        "q": search_term,
+        "hl": "en",
+        "tbm": "nws",
+    }
+
+    response = requests.get("https://www.google.com/search", headers=headers, params=params)
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    rows = create_rows(soup)
+    write_rows_to_gsheet(rows)
+
+
 def create_rows(soup):
     today = datetime.datetime.today()
     rows = []
@@ -52,22 +70,8 @@ def write_rows_to_gsheet(rows):
 
 
 if __name__ == '__main__':
-    headers = {
-        # "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36 Edge/18.19582"
-    }
-
-    params = {
-        "q": "child tax credit",
-        "hl": "en",
-        "tbm": "nws",
-    }
-
-    response = requests.get("https://www.google.com/search", headers=headers, params=params)
-    soup = BeautifulSoup(response.text, 'html.parser')
-
-    rows = create_rows(soup)
-    write_rows_to_gsheet(rows)
-
+    search_term = 'child tax credit'
+    get_latest_news_articles(search_term)
 
 
 
