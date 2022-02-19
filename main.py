@@ -6,17 +6,22 @@ import gspread
 import urllib
 
 
-def get_latest_news_articles(search_term='child tax credit'):
+def log_latest_news_articles(search_term='child tax credit'):
     all_rows = []
     offset = 1
+    # get initial page
     soup = get_soup(offset)
 
+    # todo figure offset limit out
+    # go thru results page by page
+    # if there are no results on next page or we hit our page limit then stop
     while soup is not None and offset < 5:
-        print(offset)
+        print(f'Processing page {offset}')
         rows = create_rows(soup)
         all_rows.extend(rows)
 
         offset += 1
+
         soup = get_soup(offset)
     write_rows_to_gsheet(all_rows)
 
@@ -46,9 +51,12 @@ def create_rows(soup):
     links = soup.find_all('a')
     for link in links:
         if '/url' in link['href'] and 'google' not in link['href']:
-            if link.next_element.name == 'h3':      # there are some duplicates, ones with h3 after are the ones with title etc.
+            # there are some duplicates, ones with h3 after are the ones with title etc. so only process those
+            if link.next_element.name == 'h3':
                 url = link['href']
-                url = url.split('/&amp')[0].split('&sa')[0].lstrip('/url?q=')    # remove google generated garbage at the end
+                # remove google generated garbage from the url
+                url = url.split('/&amp')[0].split('&sa')[0].lstrip('/url?q=')
+
                 title = link.next_element.text
                 publisher = link.next_element.next_sibling.text
                 hf_mentioned = is_hf_mentioned(url)
@@ -66,6 +74,7 @@ def is_hf_mentioned(url):
         if 'humanity forward' in paragraph:
             humanity_forward_mentioned = True
             break
+        # # sanity check to see if text parsing was working
         # elif 'longer the monthly ctc payments were in place' in paragraph:
         #     print('yeah')
     return humanity_forward_mentioned
@@ -78,7 +87,6 @@ def write_rows_to_gsheet(rows):
     client = gspread.authorize(credentials)
     sheet = client.open('Test HF Sheet')
 
-    # get the first sheet of the Spreadsheet
     sheet_instance = sheet.get_worksheet(0)
     for row in rows:
         sheet_instance.append_row(row)
@@ -86,7 +94,7 @@ def write_rows_to_gsheet(rows):
 
 if __name__ == '__main__':
     search_term = 'child tax credit'
-    get_latest_news_articles(search_term)
+    log_latest_news_articles(search_term)
 
 
 
