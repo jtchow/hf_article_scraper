@@ -1,13 +1,25 @@
 from bs4 import BeautifulSoup
 import requests
+import datetime
+from oauth2client.service_account import ServiceAccountCredentials
+import gspread
 
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press ⌘F8 to toggle the breakpoint.
+def is_hf_mentioned(url):
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    paragraphs = soup.find_all(text=True)
+    humanity_forward_mentioned = False
+    for paragraph in paragraphs:
+        paragraph = paragraph.lower()
+        if 'humanity forward' in paragraph:
+            humanity_forward_mentioned = True
+            break
+        elif 'longer the monthly ctc payments were in place' in paragraph:
+            print('yeah')
+    return humanity_forward_mentioned
 
 
-# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36 Edge/18.19582"
@@ -22,22 +34,37 @@ if __name__ == '__main__':
     response = requests.get("https://www.google.com/search", headers=headers, params=params)
     soup = BeautifulSoup(response.text, 'html.parser')
 
+    rows = []
     article_urls = []
-    links = soup.findAll('a')
+
+    links = soup.find_all('a')
     for link in links:
-        if '/url' in link['href']:
-            url = link['href']
-            article_urls.append(url)
-    links = [link['href'] for link in links if '/url' in link]
-    print(article_urls)
+        if '/url' in link['href'] and 'google' not in link['href']:
+            if link.next_element.name == 'h3':
+                print(link)
+                url = link['href']
+                url = url.split('/&amp')[0].split('&sa')[0].lstrip('/url?q=')    # remove google generated garbage at the end
+                title = link.next_element.text
+                publisher = link.next_element.next_sibling.text
+                hf_mentioned = is_hf_mentioned(url)
+                rows.append([url, title, publisher, hf_mentioned])
+
+    scopes = ['https://spreadsheets.google.com/feeds','https://www.googleapis.com/auth/drive']
+    credentials = ServiceAccountCredentials.from_json_keyfile_name("my_email_svc_account.json",
+                                                                   scopes)  # access the json key you downloaded earlier
+    client = gspread.authorize(credentials)
+    sheet = client.open('Test HF Sheet')
+
+    # get the first sheet of the Spreadsheet
+    sheet_instance = sheet.get_worksheet(0)
+    for row in rows:
+        print('appending row', row)
+        sheet_instance.append_row(row)
 
 
 
-    for result in soup.select('.dbsr')[:10]:
-        title = result.select_one('.nDgy9d').text
-        link = result.a['href']
-        source = result.select_one('.WF4CUc').text
-        snippet = result.select_one('.Y3v8qd').text
-        date_published = result.select_one('.WG9SHc span').text
-        print(f'{title}\n{link}\n{snippet}\n{date_published}\n{source}\n')
+
+
+
+
 
