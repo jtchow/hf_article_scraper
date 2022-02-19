@@ -6,6 +6,19 @@ import gspread
 
 
 def get_latest_news_articles(search_term='child tax credit'):
+    all_rows = []
+    offset = 0
+    soup = get_soup(offset)
+    while soup is not None and offset < 15:
+        rows = create_rows(soup)
+        all_rows.extend(rows)
+        soup = get_soup(offset)
+        offset += 1
+
+    write_rows_to_gsheet(all_rows)
+
+
+def get_soup(offset):
     headers = {
         # "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36 Edge/18.19582"
     }
@@ -14,17 +27,17 @@ def get_latest_news_articles(search_term='child tax credit'):
         "q": search_term,
         "hl": "en",
         "tbm": "nws",
+        'tbs': 'qdr:d',
+        'start': offset
     }
 
     response = requests.get("https://www.google.com/search", headers=headers, params=params)
     soup = BeautifulSoup(response.text, 'html.parser')
-
-    rows = create_rows(soup)
-    write_rows_to_gsheet(rows)
+    return soup
 
 
 def create_rows(soup):
-    today = datetime.datetime.today()
+    today = datetime.datetime.today().strftime('%Y-%m-%d')
     rows = []
 
     links = soup.find_all('a')
@@ -50,8 +63,8 @@ def is_hf_mentioned(url):
         if 'humanity forward' in paragraph:
             humanity_forward_mentioned = True
             break
-        elif 'longer the monthly ctc payments were in place' in paragraph:
-            print('yeah')
+        # elif 'longer the monthly ctc payments were in place' in paragraph:
+        #     print('yeah')
     return humanity_forward_mentioned
 
 
