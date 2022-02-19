@@ -3,24 +3,27 @@ import requests
 import datetime
 from oauth2client.service_account import ServiceAccountCredentials
 import gspread
+import urllib
 
 
 def get_latest_news_articles(search_term='child tax credit'):
     all_rows = []
-    offset = 0
+    offset = 1
     soup = get_soup(offset)
-    while soup is not None and offset < 15:
+
+    while soup is not None and offset < 5:
+        print(offset)
         rows = create_rows(soup)
         all_rows.extend(rows)
-        soup = get_soup(offset)
-        offset += 1
 
+        offset += 1
+        soup = get_soup(offset)
     write_rows_to_gsheet(all_rows)
 
 
 def get_soup(offset):
     headers = {
-        # "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36 Edge/18.19582"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36 Edge/18.19582"
     }
 
     params = {
@@ -28,7 +31,7 @@ def get_soup(offset):
         "hl": "en",
         "tbm": "nws",
         'tbs': 'qdr:d',
-        'start': offset
+        'start': offset * 10
     }
 
     response = requests.get("https://www.google.com/search", headers=headers, params=params)
@@ -78,7 +81,6 @@ def write_rows_to_gsheet(rows):
     # get the first sheet of the Spreadsheet
     sheet_instance = sheet.get_worksheet(0)
     for row in rows:
-        print('appending row', row)
         sheet_instance.append_row(row)
 
 
