@@ -4,68 +4,55 @@ import datetime
 from oauth2client.service_account import ServiceAccountCredentials
 import gspread
 import urllib
+from pprint import pprint
 
 
 def log_latest_news_articles(search_term='child tax credit'):
-    all_rows = []
-    offset = 1
-    # get initial page
-    soup = get_soup(offset)
-
-    # todo figure offset limit out
-    # go thru results page by page
-    # if there are no results on next page or we hit our page limit then stop
-    while soup is not None and offset < 5:
-        print(f'Processing page {offset}')
-        rows = create_rows(soup)
-        all_rows.extend(rows)
-
-        offset += 1
-
-        soup = get_soup(offset)
-    write_rows_to_gsheet(all_rows)
-
-
-def get_soup(offset):
+    params = {
+        "q": search_term,
+        "hl": "en"
+    }
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.102 Safari/537.36 Edge/18.19582"
     }
-
-    params = {
-        "q": search_term,
-        "hl": "en",
-        "tbm": "nws",
-        'tbs': 'qdr:d',
-        'start': offset * 10
-    }
-
-    response = requests.get("https://www.google.com/search", headers=headers, params=params)
+    response = requests.get("https://www.news.google.com/search", headers=headers, params=params)
     soup = BeautifulSoup(response.text, 'html.parser')
-    return soup
+
+    rows = create_rows(soup)
+    write_rows_to_gsheet(rows)
 
 
 def create_rows(soup):
     today = datetime.datetime.today().strftime('%Y-%m-%d')
     rows = []
 
-    links = soup.find_all('a')
-    for link in links:
-        if '/url' in link['href'] and 'google' not in link['href']:
-            # there are some duplicates, ones with h3 after are the ones with title etc. so only process those
-            if link.next_element.name == 'h3':
-                url = link['href']
-                # remove google generated garbage from the url
-                url = url.split('/&amp')[0].split('&sa')[0].lstrip('/url?q=')
+    # get all the info for the whole result set
+    links = soup.find_all('a', {'class': ['DY5T1d RZIKme']})
+    # links looks like : title, publisher, title, publisher so we do below
+    titles = [link.text for link in links[::2]]  # grab every other element for title
+    publishers = [link.text for link in links[1::2]]  # grab every other element for publisher
+    urls = []
+    hf_mentions = []
 
-                title = link.next_element.text
-                publisher = link.next_element.next_sibling.text
-                hf_mentioned = is_hf_mentioned(url)
-                rows.append([title, 'subtitle', today, publisher, 'author', url, hf_mentioned])
+    google_generated_extensions = [link.get('href') for link in links]
+    google_generated_extensions = [url.strip('.') for url in google_generated_extensions]
+    for url_extension in google_generated_extensions:
+        res = requests.get('https://www.news.google.com' + url_extension)
+        urls.append(res.url)
+        hf_mentioned = is_hf_mentioned(res)
+        hf_mentions.append(hf_mentioned)
+
+    # put together the actual rows we are going to insert in gsheets
+    for i in range(links):
+        title = titles[i]
+        publisher = publishers[i]
+        url = urls[i]
+        hf_mentioned = hf_mentions[i]
+        rows.append([title, 'subtitle', today, publisher, 'author', url, hf_mentioned])
     return rows
 
 
-def is_hf_mentioned(url):
-    response = requests.get(url)
+def is_hf_mentioned(response):
     soup = BeautifulSoup(response.text, 'html.parser')
     paragraphs = soup.find_all(text=True)
     humanity_forward_mentioned = False
@@ -92,9 +79,21 @@ def write_rows_to_gsheet(rows):
         sheet_instance.append_row(row)
 
 
+def get_real_urls(fake_urls):
+    for url_extension in fake_urls:
+        res = requests.get('https://www.news.google.com' + url_extension)
+        print(res.url)
+
+
 if __name__ == '__main__':
-    search_term = 'child tax credit'
+    search_term = 'child tax credit when:1d'
     log_latest_news_articles(search_term)
+
+
+
+
+
+
 
 
 
