@@ -3,8 +3,6 @@ import requests
 import datetime
 from oauth2client.service_account import ServiceAccountCredentials
 import gspread
-import urllib
-from pprint import pprint
 
 
 def log_latest_news_articles(search_term='child tax credit'):
@@ -43,7 +41,7 @@ def create_rows(soup):
         hf_mentions.append(hf_mentioned)
 
     # put together the actual rows we are going to insert in gsheets
-    for i in range(links):
+    for i in range(len(links)):
         title = titles[i]
         publisher = publishers[i]
         url = urls[i]
@@ -77,12 +75,6 @@ def write_rows_to_gsheet(rows):
     sheet_instance = sheet.get_worksheet(0)
     for row in rows:
         sheet_instance.append_row(row)
-
-
-def get_real_urls(fake_urls):
-    for url_extension in fake_urls:
-        res = requests.get('https://www.news.google.com' + url_extension)
-        print(res.url)
 
 
 if __name__ == '__main__':
